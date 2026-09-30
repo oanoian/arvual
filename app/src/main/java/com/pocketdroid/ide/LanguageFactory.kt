@@ -15,8 +15,6 @@ object LanguageFactory {
         return when (ext) {
             "kt", "kts" -> "source.kotlin"
             "java" -> "source.java"
-            "json" -> "source.json"
-            "xml" -> "text.xml"
             else -> null
         }
     }
@@ -24,18 +22,19 @@ object LanguageFactory {
     fun applyTo(editor: CodeEditor, fileName: String) {
         val scope = scopeFor(fileName)
         if (scope == null) {
-            editor.setEditorLanguage(io.github.rosemoe.sora.langs.plaintext.PlainTextLanguage())
+            editor.setEditorLanguage(io.github.rosemoe.sora.lang.EmptyLanguage())
             return
         }
         try {
             val lang = TextMateLanguage.create(
                 scope,
+                GrammarRegistry.getInstance(),
+                ThemeRegistry.getInstance(),
                 true,
-                GrammarRegistry.instance.getThemeModel(ThemeRegistry.instance.themeName),
             )
             editor.setEditorLanguage(lang)
         } catch (_: Exception) {
-            editor.setEditorLanguage(io.github.rosemoe.sora.langs.plaintext.PlainTextLanguage())
+            editor.setEditorLanguage(io.github.rosemoe.sora.lang.EmptyLanguage())
         }
     }
 }

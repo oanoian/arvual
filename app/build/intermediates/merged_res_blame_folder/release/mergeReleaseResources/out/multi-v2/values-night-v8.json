@@ -1,0 +1,19 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.pocketdroid.ide.app-mergeReleaseResources-39:/values-night-v8/values-night-v8.xml",
+            "map": [
+                {
+                    "source": "/root/.gradle/caches/transforms-4/62648efdf034554e57ea52c928faef16/transformed/editor-0.23.6/res/values-night-v8/values-night-v8.xml",
+                    "from": {
+                        "startLines": "2,3",
+                        "startColumns": "4,4",
+                        "startOffsets": "55,146",
+                        "endColumns": "90,74",
+                        "endOffsets": "141,216"
+                    }
+                }
+            ]
+        }
+    ]
+}
