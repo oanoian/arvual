@@ -176,6 +176,10 @@ object RuntimeManager {
      * PYTHONHOME/NODE_PATH as belt-and-braces.
      */
     fun writeLaunchers(context: Context) {
+        runCatching {
+            com.pocketdroid.ide.core.CoreBridge.publish(
+                com.pocketdroid.ide.core.CoreBridge.Event.RuntimeStatus("launchers", "written"))
+        }
         val rt = rootDir(context)
         val bin = binDir(context)
         val py = "${rt.absolutePath}/python"

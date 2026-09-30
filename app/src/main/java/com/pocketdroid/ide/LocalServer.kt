@@ -31,12 +31,18 @@ class LocalServer private constructor(
             val s = LocalServer(root, PORT)
             s.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false)
             current = s
+            com.pocketdroid.ide.core.CoreBridge.publish(
+                com.pocketdroid.ide.core.CoreBridge.Event.ServerStatus("http://localhost:$PORT/", root.name))
             return "http://localhost:$PORT/"
         }
 
         fun stop() {
             current?.stop()
             current = null
+            runCatching {
+                com.pocketdroid.ide.core.CoreBridge.publish(
+                    com.pocketdroid.ide.core.CoreBridge.Event.ServerStatus(null, null))
+            }
         }
 
         fun isRunning(): Boolean = current != null

@@ -10,12 +10,21 @@ import com.pocketdroid.ide.ui.IdeScreen
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.pocketdroid.ide.core.CoreBridge.init(this)
         AssetsBundle.init(this)
         TextMateBootstrap.init(this)
+        RuntimeManager.writeLaunchers(this)
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 IdeScreen(this)
             }
         }
+    }
+
+    override fun onDestroy() {
+        // Sandbox lifecycle hygiene: never leave orphaned shells/servers behind.
+        runCatching { com.pocketdroid.ide.LocalServer.stop() }
+        runCatching { com.pocketdroid.ide.ui.TerminalSessions.closeAll() }
+        super.onDestroy()
     }
 }
