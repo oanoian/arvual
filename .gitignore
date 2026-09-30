@@ -7,3 +7,4 @@ local.propertiesnode_modules/
 dist/
 build/
 *.log
+node_modules/
