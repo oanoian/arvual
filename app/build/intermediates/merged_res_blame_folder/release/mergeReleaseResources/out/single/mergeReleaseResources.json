@@ -1,0 +1,14 @@
+[
+    {
+        "merged": "com.pocketdroid.ide.app-release-41:/drawable_ic_launcher_foreground.xml.flat",
+        "source": "com.pocketdroid.ide.app-main-42:/drawable/ic_launcher_foreground.xml"
+    },
+    {
+        "merged": "com.pocketdroid.ide.app-release-41:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "com.pocketdroid.ide.app-main-42:/mipmap-anydpi-v26/ic_launcher.xml"
+    },
+    {
+        "merged": "com.pocketdroid.ide.app-release-41:/drawable_ic_launcher_background.xml.flat",
+        "source": "com.pocketdroid.ide.app-main-42:/drawable/ic_launcher_background.xml"
+    }
+]

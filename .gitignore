@@ -1,0 +1,10 @@
+# Gradle
+.gradle/
+
+# Android local properties
+local.propertiesnode_modules/
+.next/
+dist/
+build/
+*.log
+node_modules/
