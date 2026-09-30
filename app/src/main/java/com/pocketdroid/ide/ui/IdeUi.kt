@@ -25,7 +25,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.pocketdroid.ide.AssetsBundle
+import com.pocketdroid.ide.LocalServer
+import com.pocketdroid.ide.TranslateEngine
 import com.pocketdroid.ide.LanguageFactory
+import com.pocketdroid.ide.RuntimeManager
 import com.pocketdroid.ide.TerminalEngine
 import io.github.rosemoe.sora.widget.CodeEditor
 import java.io.File
@@ -38,7 +41,7 @@ private val Green = Color(0xFF7EE787)
 private val Red = Color(0xFFF85149)
 private val Muted = Color(0xFF8B949E)
 
-enum class BottomTab { TERMINAL, PROBLEMS }
+enum class BottomTab { TERMINAL, RUNTIMES, DEPLOY, PROBLEMS }
 
 @Composable
 fun IdeScreen(context: Context) {
@@ -52,6 +55,8 @@ fun IdeScreen(context: Context) {
     var input by remember { mutableStateOf("") }
     var tab by remember { mutableStateOf(BottomTab.TERMINAL) }
     var running by remember { mutableStateOf(false) }
+    var installed by remember { mutableStateOf(RuntimeManager.installed(context)) }
+    var runtimeMsg by remember { mutableStateOf("") }
     val scroll = rememberScrollState()
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -252,6 +257,66 @@ fun IdeScreen(context: Context) {
                         )
                     }
                 }
+            } else if (tab == BottomTab.RUNTIMES) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(scroll)
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        "On-device toolchains (downloaded into app storage; no root needed).\n" +
+                            "Note: arm64-v8a devices only.",
+                        color = Muted, fontSize = 11.sp
+                    )
+                    RuntimeManager.available.filter { !it.name.endsWith("-libs") }.forEach { rt ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                        ) {
+                            Text(
+                                rt.label,
+                                color = Fg, fontSize = 13.sp,
+                                modifier = Modifier.weight(1f)
+                            )
+                            val have = installed.contains(rt.name)
+                            if (have) {
+                                Text("installed ✓", color = Green, fontSize = 12.sp)
+                            } else {
+                                Button(
+                                    onClick = {
+                                        runtimeMsg = "Starting ${rt.name} download..."
+                                        RuntimeManager.install(context, rt.name) { pct, msg ->
+                                            android.os.Handler(android.os.Looper.getMainLooper())
+                                                .post {
+                                                    runtimeMsg = if (pct < 0) msg
+                                                    else "$msg ($pct%)"
+                                                    if (pct == 100) {
+                                                        installed = RuntimeManager.installed(context)
+                                                        terminalLines = terminalLines +
+                                                            "[${rt.name} ready — try '${if (rt.name == "python") "python --version" else "node --version"}' in TERMINAL]"
+                                                    }
+                                                }
+                                        }
+                                    },
+                                    enabled = !RuntimeManager.isBusy(),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                ) {
+                                    Text("install ~${rt.sizeHintMB}MB", fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                    if (runtimeMsg.isNotEmpty()) {
+                        Text(runtimeMsg, color = Accent, fontSize = 12.sp)
+                    }
+                    Text(
+                        "After install: python / pip / node / npm / npx work directly in the TERMINAL tab.",
+                        color = Muted, fontSize = 11.sp
+                    )
+                }
+            } else if (tab == BottomTab.DEPLOY) {
+                DeployPanel(context, project, setLines = { terminalLines = terminalLines + it })
             } else {
                 Box(modifier = Modifier.weight(1f).padding(8.dp)) {
                     Text(
@@ -284,7 +349,13 @@ private fun submitTerminalCommand(
     setInput("")
     setLines("\$ $cmd")
     Thread {
-        val res = TerminalEngine.exec(context, workDir, cmd.trim())
+        val c = cmd.trim()
+        // pip/npm installs and first-run interpreter checks can take minutes.
+        val slow = listOf("install", "init", "create-vite", "add", "build", "run dev")
+            .any { c.contains(it) } || c.startsWith("npm") || c.startsWith("pip") ||
+            c.startsWith("npx") || c.startsWith("yarn")
+        val res = if (slow) TerminalEngine.execLong(context, workDir, c)
+        else TerminalEngine.exec(context, workDir, c)
         android.os.Handler(android.os.Looper.getMainLooper()).post {
             when (res.exitCode) {
                 -2 -> setLines("[shell session ended]")
@@ -297,4 +368,76 @@ private fun submitTerminalCommand(
             setRunning(false)
         }
     }.start()
+}
+
+@Composable
+private fun DeployPanel(
+    context: android.content.Context,
+    project: java.io.File?,
+    setLines: (String) -> Unit,
+) {
+    var status by remember { mutableStateOf("") }
+    var url by remember { mutableStateOf<String?>(null) }
+    val dir = project ?: AssetsBundle.projectsRoot
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+    ) {
+        Text(
+            "Translate & deploy — detects project type, prepares artifacts, and serves on localhost.",
+            color = Muted, fontSize = 11.sp
+        )
+        Spacer(Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Button(
+                onClick = {
+                    val r = TranslateEngine.translate(context, dir)
+                    status = "[${r.kind}] ${r.message}" +
+                        (r.startCommand?.let { "\n\$ $it" } ?: "")
+                    setLines("[deploy] ${r.message}")
+                    if (r.webRoot != null && r.kind == TranslateEngine.ProjectKind.WEB_STATIC) {
+                        url = LocalServer.serve(r.webRoot)
+                        setLines("[server] serving ${r.webRoot.name} at $url")
+                    }
+                },
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+            ) { Text("Detect & prepare", fontSize = 12.sp) }
+
+            Spacer(Modifier.width(8.dp))
+            Button(
+                onClick = {
+                    url = LocalServer.serve(dir)
+                    status = "Serving entire project folder."
+                    setLines("[server] $url")
+                },
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+            ) { Text("Serve folder", fontSize = 12.sp) }
+
+            Spacer(Modifier.width(8.dp))
+            OutlinedButton(
+                onClick = {
+                    LocalServer.stop()
+                    status = "Server stopped."
+                    url = null
+                    setLines("[server] stopped")
+                },
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+            ) { Text("Stop", fontSize = 12.sp) }
+        }
+        Spacer(Modifier.height(6.dp))
+        if (status.isNotEmpty()) Text(status, color = Fg, fontSize = 12.sp)
+        url?.let {
+            Text("Open in device browser: $it", color = Accent, fontSize = 13.sp)
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Executable (.exe) note: Android cannot emit Windows PE binaries directly.\n" +
+                "For Python projects we bundle a PyInstaller spec; for Node we write a pkg config.\n" +
+                "Run 'build-exe.sh' / 'build-exe.bat' on any PC to get win/linux/macos binaries.",
+            color = Muted, fontSize = 11.sp
+        )
+    }
 }

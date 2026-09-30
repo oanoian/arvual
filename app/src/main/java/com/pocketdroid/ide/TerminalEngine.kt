@@ -26,10 +26,20 @@ object TerminalEngine {
     fun shellEnv(context: Context, cwd: File): MutableMap<String, String> {
         val home = File(context.filesDir, "home").apply { mkdirs() }
         cwd.mkdirs()
+        val rtRoot = File(context.filesDir, "runtimes")
+        val ld = listOf(
+            File(rtRoot, "python/lib"),
+            File(rtRoot, "nodejs/lib"),
+        ).filter { it.exists() }.joinToString(":")
         return mutableMapOf(
             "HOME" to home.absolutePath,
             "TMPDIR" to context.cacheDir.absolutePath,
-            "PATH" to "/system/bin:/vendor/bin:${File(context.applicationInfo.dataDir, "bin").absolutePath}",
+            // App bin dir first so installed runtimes (python/node/npm) win
+            // over anything in /system/bin.
+            "PATH" to "${File(context.filesDir, "bin").absolutePath}:/system/bin:/vendor/bin",
+            "LD_LIBRARY_PATH" to ld,
+            "PYTHONHOME" to File(rtRoot, "python").absolutePath,
+            "NODE_PATH" to File(rtRoot, "nodejs/lib/node_modules").absolutePath,
             "LANG" to "en_US.UTF-8",
             "ANDROID_DATA" to context.dataDir.absolutePath,
         )
@@ -39,7 +49,13 @@ object TerminalEngine {
     fun exec(context: Context, cwd: File, commandLine: String): ExecResult =
         executor.submit<ExecResult> { runBlocking(context, cwd, commandLine) }.get()
 
-    private fun runBlocking(context: Context, cwd: File, commandLine: String): ExecResult {
+    /** Long-running commands (pip install, npm install) get 10 minutes. */
+    fun execLong(context: Context, cwd: File, commandLine: String): ExecResult =
+        executor.submit<ExecResult> { runBlocking(context, cwd, commandLine, 600) }.get()
+
+    private fun runBlocking(
+        context: Context, cwd: File, commandLine: String, timeoutSec: Long = 60,
+    ): ExecResult {
         if (commandLine.isBlank()) return ExecResult("", "", 0)
         if (commandLine.trim() == "exit") return ExecResult("", "", -2)
         return try {
@@ -57,10 +73,10 @@ object TerminalEngine {
                 BufferedReader(InputStreamReader(p.errorStream)).forEachLine { err.appendLine(it) }
             }
             t1.start(); t2.start()
-            val finished = p.waitFor(60, TimeUnit.SECONDS)
+            val finished = p.waitFor(timeoutSec, TimeUnit.SECONDS)
             if (!finished) {
                 p.destroy()
-                return ExecResult(out.toString(), err.toString() + "\n[timed out after 60s]", 124)
+                return ExecResult(out.toString(), err.toString() + "\n[timed out after ${timeoutSec}s]", 124)
             }
             t1.join(2000); t2.join(2000)
             ExecResult(out.toString(), err.toString(), p.exitValue())

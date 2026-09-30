@@ -1,9 +1,9 @@
 -- Merging decision tree log ---
 manifest
-ADDED from /workspace/app/src/main/AndroidManifest.xml:2:1-21:12
-INJECTED from /workspace/app/src/main/AndroidManifest.xml:2:1-21:12
-INJECTED from /workspace/app/src/main/AndroidManifest.xml:2:1-21:12
-INJECTED from /workspace/app/src/main/AndroidManifest.xml:2:1-21:12
+ADDED from /workspace/app/src/main/AndroidManifest.xml:2:1-23:12
+INJECTED from /workspace/app/src/main/AndroidManifest.xml:2:1-23:12
+INJECTED from /workspace/app/src/main/AndroidManifest.xml:2:1-23:12
+INJECTED from /workspace/app/src/main/AndroidManifest.xml:2:1-23:12
 MERGED from [androidx.activity:activity:1.9.0] /root/.gradle/caches/transforms-4/9c50eb7d107512960e4a46045a6404ed/transformed/activity-1.9.0/AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.activity:activity-ktx:1.9.0] /root/.gradle/caches/transforms-4/2602c25c5807510498a8a3f41859b006/transformed/activity-ktx-1.9.0/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.compose.material3:material3-android:1.2.1] /root/.gradle/caches/transforms-4/76c23585131085e4f25bc8d273b2829f/transformed/material3-release/AndroidManifest.xml:17:1-22:12
@@ -54,9 +54,13 @@ MERGED from [androidx.arch.core:core-runtime:2.2.0] /root/.gradle/caches/transfo
 		INJECTED from /workspace/app/src/main/AndroidManifest.xml
 	xmlns:android
 		ADDED from /workspace/app/src/main/AndroidManifest.xml:2:11-69
+uses-permission#android.permission.INTERNET
+ADDED from /workspace/app/src/main/AndroidManifest.xml:4:5-67
+	android:name
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:4:22-64
 application
-ADDED from /workspace/app/src/main/AndroidManifest.xml:4:5-19:19
-INJECTED from /workspace/app/src/main/AndroidManifest.xml:4:5-19:19
+ADDED from /workspace/app/src/main/AndroidManifest.xml:6:5-21:19
+INJECTED from /workspace/app/src/main/AndroidManifest.xml:6:5-21:19
 MERGED from [androidx.emoji2:emoji2:1.3.0] /root/.gradle/caches/transforms-4/0234fdbfadf489cdd91f803378fbedc5/transformed/emoji2-1.3.0/AndroidManifest.xml:23:5-33:19
 MERGED from [androidx.emoji2:emoji2:1.3.0] /root/.gradle/caches/transforms-4/0234fdbfadf489cdd91f803378fbedc5/transformed/emoji2-1.3.0/AndroidManifest.xml:23:5-33:19
 MERGED from [androidx.core:core:1.13.1] /root/.gradle/caches/transforms-4/1eec0393bba75e2ee9a5fdc87d0708af/transformed/core-1.13.1/AndroidManifest.xml:28:5-89
@@ -74,33 +78,33 @@ MERGED from [androidx.startup:startup-runtime:1.1.1] /root/.gradle/caches/transf
 	android:appComponentFactory
 		ADDED from [androidx.core:core:1.13.1] /root/.gradle/caches/transforms-4/1eec0393bba75e2ee9a5fdc87d0708af/transformed/core-1.13.1/AndroidManifest.xml:28:18-86
 	android:supportsRtl
-		ADDED from /workspace/app/src/main/AndroidManifest.xml:8:9-35
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:10:9-35
 	android:label
-		ADDED from /workspace/app/src/main/AndroidManifest.xml:7:9-41
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:9:9-41
 	android:icon
-		ADDED from /workspace/app/src/main/AndroidManifest.xml:6:9-43
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:8:9-43
 	android:allowBackup
-		ADDED from /workspace/app/src/main/AndroidManifest.xml:5:9-35
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:7:9-35
 	android:theme
-		ADDED from /workspace/app/src/main/AndroidManifest.xml:9:9-49
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:11:9-49
 activity#com.pocketdroid.ide.MainActivity
-ADDED from /workspace/app/src/main/AndroidManifest.xml:10:9-18:20
+ADDED from /workspace/app/src/main/AndroidManifest.xml:12:9-20:20
 	android:windowSoftInputMode
-		ADDED from /workspace/app/src/main/AndroidManifest.xml:13:13-55
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:15:13-55
 	android:exported
-		ADDED from /workspace/app/src/main/AndroidManifest.xml:12:13-36
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:14:13-36
 	android:name
-		ADDED from /workspace/app/src/main/AndroidManifest.xml:11:13-41
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:13:13-41
 intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
-ADDED from /workspace/app/src/main/AndroidManifest.xml:14:13-17:29
+ADDED from /workspace/app/src/main/AndroidManifest.xml:16:13-19:29
 action#android.intent.action.MAIN
-ADDED from /workspace/app/src/main/AndroidManifest.xml:15:17-69
+ADDED from /workspace/app/src/main/AndroidManifest.xml:17:17-69
 	android:name
-		ADDED from /workspace/app/src/main/AndroidManifest.xml:15:25-66
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:17:25-66
 category#android.intent.category.LAUNCHER
-ADDED from /workspace/app/src/main/AndroidManifest.xml:16:17-77
+ADDED from /workspace/app/src/main/AndroidManifest.xml:18:17-77
 	android:name
-		ADDED from /workspace/app/src/main/AndroidManifest.xml:16:27-74
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:18:27-74
 uses-sdk
 INJECTED from /workspace/app/src/main/AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from /workspace/app/src/main/AndroidManifest.xml

@@ -1,6 +1,6 @@
-# Android/Gradle build artifacts
+# Build and Gradle artifacts
 build/
-app/build/node_modules/
-.next/
-dist/
-*.log
+.gradle/
+
+# Kotlin build caches (often nested in build/, but explicit for safety if structure varies)
+kotlin/
