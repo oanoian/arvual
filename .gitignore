@@ -1,10 +1,6 @@
-# Gradle
-.gradle/
-
-# Android local properties
-local.propertiesnode_modules/
+# Android/Gradle build artifacts
+build/
+app/build/node_modules/
 .next/
 dist/
-build/
 *.log
-node_modules/
