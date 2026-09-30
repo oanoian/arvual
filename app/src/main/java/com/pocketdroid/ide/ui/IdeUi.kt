@@ -168,8 +168,8 @@ fun IdeScreen(context: Context) {
                                 setText(editorText)
                                 LanguageFactory.applyTo(this, openFile?.name ?: "")
                                 subscribeEvent(
-                                    io.github.rosemoe.sora.event.ContentChangedEvent::class.java
-                                ) { _, _ ->
+                                    io.github.rosemoe.sora.event.ContentChangeEvent::class.java
+                                ) { _: io.github.rosemoe.sora.event.ContentChangeEvent, _: io.github.rosemoe.sora.event.Unsubscribe ->
                                     dirty = true
                                     editorText = text.toString()
                                 }
