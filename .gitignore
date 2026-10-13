@@ -1,6 +1,2 @@
-# Android/Gradle build artifacts
-build/
-app/build/node_modules/
-.next/
-dist/
-*.log
+# Gradle build cache and metadata
+.gradle/

@@ -1,0 +1,91 @@
+{
+  "name": "dark",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#1E1E1E",
+    "editor.foreground": "#D4D4D4"
+  },
+  "tokenColors": [
+    {
+      "settings": {
+        "foreground": "#D4D4D4",
+        "background": "#1E1E1E"
+      }
+    },
+    {
+      "name": "Comment",
+      "scope": ["comment", "punctuation.definition.comment"],
+      "settings": { "foreground": "#6A9955", "fontStyle": "italic" }
+    },
+    {
+      "name": "Keyword",
+      "scope": ["keyword", "storage.type", "storage.modifier"],
+      "settings": { "foreground": "#569CD6" }
+    },
+    {
+      "name": "Control keyword",
+      "scope": ["keyword.control"],
+      "settings": { "foreground": "#C586C0" }
+    },
+    {
+      "name": "String",
+      "scope": ["string", "punctuation.definition.string"],
+      "settings": { "foreground": "#CE9178" }
+    },
+    {
+      "name": "Number",
+      "scope": ["constant.numeric"],
+      "settings": { "foreground": "#B5CEA8" }
+    },
+    {
+      "name": "Constant",
+      "scope": ["constant.language", "constant.character", "variable.other.constant"],
+      "settings": { "foreground": "#4FC1FF" }
+    },
+    {
+      "name": "Function declaration",
+      "scope": ["entity.name.function"],
+      "settings": { "foreground": "#DCDCAA" }
+    },
+    {
+      "name": "Type / class name",
+      "scope": ["entity.name.type", "entity.name.class", "support.class", "support.type"],
+      "settings": { "foreground": "#4EC9B0" }
+    },
+    {
+      "name": "Annotation",
+      "scope": ["storage.type.annotation", "punctuation.definition.annotation"],
+      "settings": { "foreground": "#DCDCAA" }
+    },
+    {
+      "name": "Operator",
+      "scope": ["keyword.operator"],
+      "settings": { "foreground": "#D4D4D4" }
+    },
+    {
+      "name": "Variable",
+      "scope": ["variable", "variable.other"],
+      "settings": { "foreground": "#9CDCFE" }
+    },
+    {
+      "name": "Parameter",
+      "scope": ["variable.parameter"],
+      "settings": { "foreground": "#9CDCFE" }
+    },
+    {
+      "name": "Package / import",
+      "scope": ["entity.name.namespace", "support.module", "support.other.package"],
+      "settings": { "foreground": "#4EC9B0" }
+    },
+    {
+      "name": "Invalid",
+      "scope": ["invalid"],
+      "settings": { "foreground": "#F44747" }
+    },
+    {
+      "name": "Punctuation",
+      "scope": ["punctuation.separator", "punctuation.terminator", "meta.brace"],
+      "settings": { "foreground": "#D4D4D4" }
+    }
+  ]
+}

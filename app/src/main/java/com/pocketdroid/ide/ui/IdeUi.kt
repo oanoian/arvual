@@ -25,8 +25,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.pocketdroid.ide.AssetsBundle
+import com.pocketdroid.ide.LocalServer
+import com.pocketdroid.ide.TranslateEngine
 import com.pocketdroid.ide.LanguageFactory
+import com.pocketdroid.ide.RuntimeManager
 import com.pocketdroid.ide.TerminalEngine
+import com.pocketdroid.ide.core.AnalyzeEngine
+import com.pocketdroid.ide.core.CoreBridge
+import com.pocketdroid.ide.core.WorkspaceStore
 import io.github.rosemoe.sora.widget.CodeEditor
 import java.io.File
 
@@ -38,7 +44,7 @@ private val Green = Color(0xFF7EE787)
 private val Red = Color(0xFFF85149)
 private val Muted = Color(0xFF8B949E)
 
-enum class BottomTab { TERMINAL, PROBLEMS }
+enum class BottomTab { TERMINAL, RUNTIMES, DEPLOY, PROBLEMS, SEARCH }
 
 @Composable
 fun IdeScreen(context: Context) {
@@ -52,7 +58,60 @@ fun IdeScreen(context: Context) {
     var input by remember { mutableStateOf("") }
     var tab by remember { mutableStateOf(BottomTab.TERMINAL) }
     var running by remember { mutableStateOf(false) }
+    var installed by remember { mutableStateOf(RuntimeManager.installed(context)) }
+    var runtimeMsg by remember { mutableStateOf("") }
+    var problems by remember { mutableStateOf<List<CoreBridge.Event.Diagnostic>>(emptyList()) }
+    var editorRef by remember { mutableStateOf<CodeEditor?>(null) }
+    var pendingJump by remember { mutableStateOf<Pair<File, Int>?>(null) }
     val scroll = rememberScrollState()
+
+    // ---- Control-plane subscription: diagnostics stream into the PROBLEMS tab.
+    DisposableEffect(Unit) {
+        val unsub = CoreBridge.subscribe { ev ->
+            if (ev is CoreBridge.Event.Diagnostic)
+                android.os.Handler(android.os.Looper.getMainLooper())
+                    .post { problems = (listOf(ev) + problems).take(200) }
+        }
+        onDispose { unsub() }
+    }
+
+    // ---- Workspace restore (persistence layer).
+    LaunchedEffect(Unit) {
+        val ws = WorkspaceStore.load(context)
+        ws.projectName?.let { name ->
+            val dir = AssetsBundle.projectDir(name)
+            if (dir.isDirectory) project = dir
+        }
+        ws.tabs.firstOrNull()?.let { t ->
+            val f = File(t.path)
+            if (f.isFile && (project == null || f.absolutePath.startsWith(project!!.absolutePath))) {
+                openFile = f
+                editorText = runCatching { AssetsBundle.readText(f) }.getOrDefault("")
+                dirty = false
+            }
+        }
+    }
+
+    // ---- Save workspace whenever tabs/project change (debounced by Compose recomposition).
+    LaunchedEffect(project, openFile) {
+        WorkspaceStore.save(
+            context,
+            WorkspaceStore.Workspace(
+                projectName = project?.name,
+                tabs = openFile?.let { listOf(WorkspaceStore.TabState(it.absolutePath)) } ?: emptyList(),
+                activeTab = openFile?.absolutePath,
+                terminalCwd = project?.absolutePath,
+            )
+        )
+    }
+
+    fun saveCurrentFile() {
+        openFile?.let {
+            AssetsBundle.writeText(it, editorText)
+            dirty = false
+            AnalyzeEngine.analyzeNow(it, editorText)   // feed the PROBLEMS panel
+        }
+    }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
@@ -100,9 +159,7 @@ fun IdeScreen(context: Context) {
                 dirty = false
             }) { Text("New file", color = Accent, fontSize = 13.sp) }
             if (openFile != null) {
-                TextButton(onClick = {
-                    openFile?.let { AssetsBundle.writeText(it, editorText); dirty = false }
-                }) {
+                TextButton(onClick = { saveCurrentFile() }) {
                     Text(
                         if (dirty) "Save*" else "Save",
                         color = if (dirty) Color(0xFFFFA657) else Accent, fontSize = 13.sp
@@ -167,6 +224,7 @@ fun IdeScreen(context: Context) {
                                 typefaceText = android.graphics.Typeface.MONOSPACE
                                 setText(editorText)
                                 LanguageFactory.applyTo(this, openFile?.name ?: "")
+                                editorRef = this
                                 subscribeEvent(
                                     io.github.rosemoe.sora.event.ContentChangeEvent::class.java
                                 ) { _: io.github.rosemoe.sora.event.ContentChangeEvent, _: io.github.rosemoe.sora.event.Unsubscribe ->
@@ -179,6 +237,15 @@ fun IdeScreen(context: Context) {
                             if (!dirty && ed.text.toString() != editorText) {
                                 ed.setText(editorText)
                                 LanguageFactory.applyTo(ed, openFile?.name ?: "")
+                            }
+                            // Jump-to-line requested from PROBLEMS/SEARCH panels.
+                            pendingJump?.let { (f, line) ->
+                                if (f == openFile) {
+                                    val ln = (line - 1).coerceIn(0, (ed.lineCount - 1).coerceAtLeast(0))
+                                    ed.cursor.lineToLine(ln)
+                                    ed.scrollToLocation(ln, 0, true, false)
+                                    pendingJump = null
+                                }
                             }
                         }
                     )
@@ -203,64 +270,87 @@ fun IdeScreen(context: Context) {
                 }
             }
             if (tab == BottomTab.TERMINAL) {
+                InteractiveTerminal(project)
+            } else if (tab == BottomTab.SEARCH) {
+                SearchPanel(project, openFileAt = { f, line ->
+                    openFile = f
+                    editorText = runCatching { AssetsBundle.readText(f) }.getOrDefault("")
+                    dirty = false
+                    pendingJump = f to line
+                })
+            } else if (tab == BottomTab.RUNTIMES) {
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .verticalScroll(scroll)
-                        .padding(horizontal = 8.dp)
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
                 ) {
-                    terminalLines.forEach { line ->
-                        Text(
-                            line,
-                            color = when {
-                                line.startsWith("$") -> Fg
-                                line.startsWith("[") || line.contains("error", true) -> Red
-                                else -> Green
-                            },
-                            fontSize = 12.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-                }
-                Surface(color = Bg, modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 8.dp)
-                    ) {
-                        Text("$ ", color = Green, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
-                        BasicTextField(
-                            value = input,
-                            onValueChange = { input = it },
-                            singleLine = true,
-                            textStyle = LocalTextStyle.current.copy(
-                                color = Fg, fontFamily = FontFamily.Monospace, fontSize = 13.sp
-                            ),
-                            cursorBrush = androidx.compose.ui.graphics.SolidColor(Accent),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
-                            keyboardActions = KeyboardActions(
-                                onGo = {
-                                    submitTerminalCommand(
-                                        context, project, running,
-                                        cmd = input,
-                                        setRunning = { running = it },
-                                        setInput = { input = it },
-                                        setLines = { terminalLines = terminalLines + it },
-                                    )
-                                }
-                            ),
-                            modifier = Modifier.weight(1f).padding(vertical = 8.dp)
-                        )
-                    }
-                }
-            } else {
-                Box(modifier = Modifier.weight(1f).padding(8.dp)) {
                     Text(
-                        "Problems: no language server attached yet.\n" +
-                            "Planned: Kotlin compiler embeddable for on-device diagnostics.",
-                        color = Muted, fontSize = 12.sp
+                        "On-device toolchains (downloaded into app storage; no root needed).\n" +
+                            "Note: arm64-v8a devices only.",
+                        color = Muted, fontSize = 11.sp
+                    )
+                    RuntimeManager.available.filter { !it.name.endsWith("-libs") }.forEach { rt ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                        ) {
+                            Text(
+                                rt.label,
+                                color = Fg, fontSize = 13.sp,
+                                modifier = Modifier.weight(1f)
+                            )
+                            val have = installed.contains(rt.name)
+                            if (have) {
+                                Text("installed ✓", color = Green, fontSize = 12.sp)
+                            } else {
+                                Button(
+                                    onClick = {
+                                        runtimeMsg = "Starting ${rt.name} download..."
+                                        RuntimeManager.install(context, rt.name) { pct, msg ->
+                                            android.os.Handler(android.os.Looper.getMainLooper())
+                                                .post {
+                                                    runtimeMsg = if (pct < 0) msg
+                                                    else "$msg ($pct%)"
+                                                    if (pct == 100) {
+                                                        installed = RuntimeManager.installed(context)
+                                                        terminalLines = terminalLines +
+                                                            "[${rt.name} ready — try '${if (rt.name == "python") "python --version" else "node --version"}' in TERMINAL]"
+                                                    }
+                                                }
+                                        }
+                                    },
+                                    enabled = !RuntimeManager.isBusy(),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                ) {
+                                    Text("install ~${rt.sizeHintMB}MB", fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                    if (runtimeMsg.isNotEmpty()) {
+                        Text(runtimeMsg, color = Accent, fontSize = 12.sp)
+                    }
+                    Text(
+                        "After install: python / pip / node / npm / npx work directly in the TERMINAL tab.",
+                        color = Muted, fontSize = 11.sp
                     )
                 }
-            }
+            } else if (tab == BottomTab.DEPLOY) {
+                DeployPanel(context, project, setLines = { terminalLines = terminalLines + it })
+            } else if (tab == BottomTab.PROBLEMS) {
+                ProblemsPanel(problems, onClear = { problems = emptyList() }) { diag ->
+                    // Click-to-jump: resolve file inside the project if possible.
+                    val root = project ?: AssetsBundle.projectsRoot
+                    val candidate = File(root, diag.file)
+                    if (candidate.isFile) {
+                        openFile = candidate
+                        editorText = runCatching { AssetsBundle.readText(candidate) }.getOrDefault("")
+                        dirty = false
+                        pendingJump = candidate to diag.line
+                    }
+                }
+            } else Box(modifier = Modifier.weight(1f))
         }
     }
 
@@ -269,32 +359,116 @@ fun IdeScreen(context: Context) {
     }
 }
 
-private fun submitTerminalCommand(
-    context: Context,
-    project: File?,
-    running: Boolean,
-    cmd: String,
-    setRunning: (Boolean) -> Unit,
-    setInput: (String) -> Unit,
-    setLines: (String) -> Unit,
+@Composable
+private fun ProblemsPanel(
+    problems: List<CoreBridge.Event.Diagnostic>,
+    onClear: () -> Unit,
+    onClick: (CoreBridge.Event.Diagnostic) -> Unit,
 ) {
-    if (running || cmd.isBlank()) return
-    val workDir = project ?: AssetsBundle.projectsRoot
-    setRunning(true)
-    setInput("")
-    setLines("\$ $cmd")
-    Thread {
-        val res = TerminalEngine.exec(context, workDir, cmd.trim())
-        android.os.Handler(android.os.Looper.getMainLooper()).post {
-            when (res.exitCode) {
-                -2 -> setLines("[shell session ended]")
-                else -> {
-                    val out = (res.stdout + res.stderr).trimEnd()
-                    if (out.isNotEmpty()) setLines(out)
-                    if (res.exitCode != 0) setLines("[exit ${res.exitCode}]")
+    val scroll = rememberScrollState()
+    Column(modifier = Modifier.fillMaxSize().background(Bg)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 8.dp)) {
+            Text("Problems (${problems.count { it.severity == "error" }} errors, " +
+                "${problems.count { it.severity == "warning" }} warnings)",
+                color = Muted, fontSize = 11.sp, modifier = Modifier.weight(1f))
+            TextButton(onClick = onClear) { Text("clear", color = Muted, fontSize = 12.sp) }
+        }
+        if (problems.isEmpty())
+            Text(
+                "No diagnostics yet. Save a .py/.js/.html file and lightweight checks run automatically.\n" +
+                    "(Full LSP IntelliSense is the next milestone.)",
+                color = Muted, fontSize = 11.sp, modifier = Modifier.padding(8.dp),
+            )
+        else Column(modifier = Modifier.weight(1f).verticalScroll(scroll).padding(horizontal = 8.dp)) {
+            problems.forEach { p ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { onClick(p) }.padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        when (p.severity) { "error" -> "✕" ; "warning" -> "⚠" ; else -> "ℹ" },
+                        color = when (p.severity) { "error" -> Red; "warning" -> Color(0xFFFFA657); else -> Accent },
+                        fontSize = 12.sp,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "${p.file}:${p.line} — ${p.message}",
+                        color = Fg, fontSize = 11.sp, fontFamily = FontFamily.Monospace, maxLines = 2,
+                    )
                 }
             }
-            setRunning(false)
         }
-    }.start()
+    }
+}
+
+@Composable
+private fun DeployPanel(
+    context: android.content.Context,
+    project: java.io.File?,
+    setLines: (String) -> Unit,
+) {
+    var status by remember { mutableStateOf("") }
+    var url by remember { mutableStateOf<String?>(null) }
+    val dir = project ?: AssetsBundle.projectsRoot
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+    ) {
+        Text(
+            "Translate & deploy — detects project type, prepares artifacts, and serves on localhost.",
+            color = Muted, fontSize = 11.sp
+        )
+        Spacer(Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Button(
+                onClick = {
+                    val r = TranslateEngine.translate(context, dir)
+                    status = "[${r.kind}] ${r.message}" +
+                        (r.startCommand?.let { "\n\$ $it" } ?: "")
+                    setLines("[deploy] ${r.message}")
+                    if (r.webRoot != null && r.kind == TranslateEngine.ProjectKind.WEB_STATIC) {
+                        url = LocalServer.serve(r.webRoot)
+                        setLines("[server] serving ${r.webRoot.name} at $url")
+                    }
+                },
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+            ) { Text("Detect & prepare", fontSize = 12.sp) }
+
+            Spacer(Modifier.width(8.dp))
+            Button(
+                onClick = {
+                    url = LocalServer.serve(dir)
+                    status = "Serving entire project folder."
+                    setLines("[server] $url")
+                },
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+            ) { Text("Serve folder", fontSize = 12.sp) }
+
+            Spacer(Modifier.width(8.dp))
+            OutlinedButton(
+                onClick = {
+                    LocalServer.stop()
+                    status = "Server stopped."
+                    url = null
+                    setLines("[server] stopped")
+                },
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+            ) { Text("Stop", fontSize = 12.sp) }
+        }
+        Spacer(Modifier.height(6.dp))
+        if (status.isNotEmpty()) Text(status, color = Fg, fontSize = 12.sp)
+        url?.let {
+            Text("Open in device browser: $it", color = Accent, fontSize = 13.sp)
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Executable (.exe) note: Android cannot emit Windows PE binaries directly.\n" +
+                "For Python projects we bundle a PyInstaller spec; for Node we write a pkg config.\n" +
+                "Run 'build-exe.sh' / 'build-exe.bat' on any PC to get win/linux/macos binaries.",
+            color = Muted, fontSize = 11.sp
+        )
+    }
 }
